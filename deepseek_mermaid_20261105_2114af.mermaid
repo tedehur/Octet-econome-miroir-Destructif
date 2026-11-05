@@ -1,0 +1,55 @@
+flowchart TB
+  subgraph PATHS[Entrées physiques]
+    PA[Optique / Cuivre A]
+    PB[Optique / Cuivre B]
+  end
+
+  subgraph HW[Nœud matériel FPGA]
+    SERDES_A[SERDES A]
+    SERDES_B[SERDES B]
+    CLK_REC_A[Clock recovery A]
+    CLK_REC_B[Clock recovery B]
+    PTP[PTP / Référence temps]
+    ALIGN[FIFO d'alignement]
+    BIT_COMP[Comparateur position par position]
+    WINDOW[Fenêtre temporelle]
+    CRCCHK[CRC / hash par bloc\ncontrôle secondaire]
+    VOTE_LOGIC[Logique de vote]
+    DECODER[Décodeur de trame]
+    OUT_BUFFER[Buffer de sortie sécurisé]
+    HSM[HSM / TPM]
+    WATCHDOG[Watchdog]
+    TRIGGER[Trigger sécurité]
+    ALARM[Alarme / SIEM]
+    GRAV[Évaluation de gravité\nSeuils + compteur]
+    BLOCK[Blocage de l'écriture]
+    CUT[Coupure réseau principal\nBascule PCA]
+  end
+
+  PA --> SERDES_A --> CLK_REC_A --> ALIGN --> BIT_COMP
+  PB --> SERDES_B --> CLK_REC_B --> ALIGN --> BIT_COMP
+
+  PTP -.-> CLK_REC_A
+  PTP -.-> CLK_REC_B
+  PTP -.-> WINDOW
+
+  BIT_COMP --> VOTE_LOGIC
+  CRCCHK -.-> VOTE_LOGIC
+  WINDOW --> VOTE_LOGIC
+  WATCHDOG --> VOTE_LOGIC
+
+  VOTE_LOGIC -->|identique| DECODER
+  VOTE_LOGIC -->|divergence| TRIGGER
+
+  DECODER --> OUT_BUFFER --> HSM
+  HSM -->|requête signée| OUT_BUFFER
+
+  TRIGGER --> ALARM
+  TRIGGER --> GRAV
+  WATCHDOG -->|perte de synchronisation| GRAV
+  GRAV -->|divergence isolée| BLOCK
+  GRAV -->|grave ou répétée| CUT
+  BLOCK -->|refus| OUT_BUFFER
+  CUT -->|refus| OUT_BUFFER
+  CUT --> PCA_NET[(Réseau annexe PCA)]
+  ALARM -->|envoi| SIEM[(SIEM / Monitoring)]
