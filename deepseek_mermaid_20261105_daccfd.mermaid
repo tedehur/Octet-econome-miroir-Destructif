@@ -1,0 +1,31 @@
+flowchart TB
+    subgraph infra[Infrastructure]
+        direction LR
+        A[Serveur ALPHA A]
+        B[Serveur BÊTA B]
+    end
+
+    LD[Liaison directe A/B\nSuperposition matérielle FPGA]
+
+    A --> LD
+    B --> LD
+
+    subgraph postes[Postes dual-homed]
+        direction LR
+        P1[Poste 1 : Réa]
+        P2[Poste 2 : Urgences]
+        P3[Poste 3 : Bloc]
+        P4[Poste 4 : Pharmacie]
+        P5[Poste 5 : Imagerie]
+    end
+
+    A -->|liens| P1
+    B -->|liens| P1
+    A -->|liens| P2
+    B -->|liens| P2
+    A -->|liens| P3
+    B -->|liens| P3
+    A -->|liens| P4
+    B -->|liens| P4
+    A -->|liens| P5
+    B -->|liens| P5
