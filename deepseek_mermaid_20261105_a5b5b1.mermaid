@@ -1,0 +1,29 @@
+flowchart LR
+  U[Soignants / Postes dual-homed]
+  Net[Réseau fermé dual\nChemin Alpha + Chemin Bêta]
+  CL[Clones d'écriture\nStructure dégradée - données intactes]
+  A[Serveur ALPHA]
+  B[Serveur BÊTA]
+  V[Nœud de vote matériel\nSuperposition position par position]
+  Q[Écriture bloquée\nRéseau maintenu]
+  CUT[Coupure du réseau principal]
+  PCA[Réseau annexe PCA\nIsolé - Urgences, Réa]
+  QUA[Quarantaine\nAnalyse forensique]
+  subgraph SEP[Zone physiquement séparée]
+    M[Base mère\nÉcriture protégée]
+    KC[Clés de chiffrement\nSupport dédié]
+  end
+  ADM[Administrateur formé\nPrésent + clé matérielle]
+
+  U --> Net --> CL
+  CL --> A
+  CL --> B
+  A --> V
+  B --> V
+  V -->|Superposition identique| M
+  V -->|Divergence isolée| Q
+  V -->|Divergence grave ou répétée| CUT
+  CUT --> PCA
+  CUT --> QUA
+  QUA -.->|réconciliation idempotente validée| M
+  ADM -.->|autorise| M
