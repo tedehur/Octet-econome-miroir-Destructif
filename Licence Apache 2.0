@@ -1,0 +1,155 @@
+
+---
+
+## `docs/00-whitepaper.md`
+
+```markdown
+# Livre Blanc — Écosystème Octet-Économe et Miroir Destructif
+
+**Version** : 2.0 — novembre 2026
+**Statut** : recherche conceptuelle, non déployée
+
+---
+
+## Résumé
+
+Les systèmes critiques souffrent d'une vulnérabilité systémique face aux
+attaques de type ransomware et aux compromissions de réseaux internes.
+Ce document présente une architecture de résilience fondée sur un pari
+conceptuel : au lieu d'isoler les menaces par la logique, on les neutralise
+au niveau matériel et signal en multipliant les chemins, la redondance et
+la superposition binaire.
+
+Deux mécanismes distincts sont proposés :
+
+1. **La trame rigide Octet-Économe** — écriture à positions attendues,
+   au service de la superposabilité et de la détection de décalage.
+2. **Le Miroir Destructif** — deux chemins physiquement indépendants,
+   superposés par un nœud FPGA, avec réponse graduée en cas de divergence.
+
+Une note technique séparée traite d'un codage à préfixe (Huffman) pour le
+transport web — **hors du chemin de sécurité**.
+
+---
+
+## 1. Trame rigide Octet-Économe
+
+Les données sont écrites dans une trame binaire rigide, où chaque position
+est attendue. Le format sert la sécurité, pas la réduction de taille : un
+bit inséré, supprimé, ou un drapeau altéré décale toute la suite du flux,
+et ce décalage est détecté par superposition ou par contrôle d'intégrité.
+La trame seule ne détecte pas un octet dont la valeur est modifiée de
+façon identique sur les deux calques.
+
+### Propriétés
+
+- **Positions attendues** : chaque champ a une position fixe dans la trame.
+- **Détection de décalage** : toute insertion ou suppression casse la
+  géométrie et est détectée immédiatement par superposition.
+- **Pas de gain de taille revendiqué** : sur du texte courant, la trame
+  occupe 97–101 % de la taille UTF-8 d'origine. Ce coût est mesuré et
+  publié (voir [`annexes/B`](annexes/B-hypotheses-recherche.md)).
+- **Pas un chiffrement** : la confidentialité doit être assurée par un
+  chiffrement éprouvé, en plus du format.
+
+> **Note de correction (v2.0)** — L'hypothèse d'un espace codé sur 1 bit
+> et des autres octets sur 9 bits s'est révélée incompatible avec un
+> décodage sans ambiguïté (tout code commençant par `1` devient ambigu).
+> Elle est abandonnée au profit d'une trame rigide à positions attendues,
+> et d'un codage à préfixe distinct pour le transport web.
+
+Voir [`01-format-trame-rigide.md`](01-format-trame-rigide.md).
+
+---
+
+## 2. Miroir Destructif
+
+### 2.1 Principe
+
+Les utilisateurs n'écrivent jamais sur la base mère. Ils écrivent sur un
+essaim de clones d'écriture, **structurellement dégradés** (trame,
+espacement, redondance) mais **sans altération des données**. La
+dégradation augmente le coût d'exploitation pour un attaquant qui
+intercepterait un clone ; la superposition porte sur le contenu
+informatif, resté intact.
+
+### 2.2 Nœud de vote FPGA
+
+Le nœud de vote FPGA constitue le cœur de l'architecture. Il **superpose**
+les flux Alpha et Bêta position par position — sans recalcul de signature
+— sur deux chemins physiques indépendants, en maintenant un alignement
+temporel strict (référence PTP + FIFO d'alignement) ; toute
+désynchronisation, même d'un cycle, est traitée comme une divergence.
+
+Les clones d'écriture sont structurellement dégradés sans altération des
+données : la superposition porte sur le contenu informatif, la dégradation
+augmentant le coût d'exploitation pour un attaquant qui intercepterait un
+clone.
+
+> Le CRC/hash par bloc, décrit au Niveau 2, est un contrôle secondaire
+> d'intégrité de blocs — il ne participe pas à la décision de vote et ne
+> remplace pas la superposition.
+
+### 2.3 Réponse graduée
+
+En cas de divergence, la logique de sécurité alerte le SIEM et applique
+une réponse graduée :
+
+- **Divergence isolée** → blocage de l'écriture concernée, journalisation,
+  chemins Alpha et Bêta maintenus ; le réseau hospitalier fermé reste actif.
+- **Divergence grave ou répétée** → coupure du réseau principal, bascule
+  des services critiques (Urgences, Réanimation) sur le réseau annexe PCA
+  physiquement isolé, mise en quarantaine pour analyse forensique, puis
+  réconciliation idempotente après validation.
+
+Les seuils de gravité sont définis et éprouvés en banc d'essai (voir
+[`04-reponse-graduee.md`](04-reponse-graduee.md)) ; ils ne doivent pas
+permettre à un attaquant de provoquer des coupures à volonté.
+
+### 2.4 Point aveugle — source de dédoublement
+
+La source de dédoublement, située en amont du nœud de vote, est la seule
+zone où une corruption identique sur les deux calques échapperait à la
+superposition : elle est supervisée, séparée physiquement, et auditée en
+priorité par la Red Team (voir [`07-modele-de-menace.md`](07-modele-de-menace.md)).
+
+### 2.5 Séparation physique des privilèges
+
+Une écriture n'est enregistrée dans la base mère qu'après un vote identique
+et l'autorisation d'un administrateur formé, présent physiquement avec sa
+clé matérielle ; la base mère et les clés de chiffrement sont conservées
+sur des supports physiquement séparés.
+
+Voir [`02-miroir-destructif.md`](02-miroir-destructif.md) et
+[`03-noeud-vote-fpga.md`](03-noeud-vote-fpga.md).
+
+---
+
+## 3. Feuille de route et appel aux contributeurs
+
+La feuille de route se structure en cinq lots à critères de sortie
+mesurables. Voir [`06-feuille-de-route.md`](06-feuille-de-route.md).
+
+---
+
+## 4. Ce que ce document ne prétend pas
+
+- Aucun gain de stockage ou d'énergie n'est revendiqué.
+- Aucune affirmation de sécurité absolue n'est faite : la superposition
+  garantit la cohérence, pas l'authenticité.
+- Les mécanismes de vote et de réponse graduée ne sont pas encore
+  implémentés ni mesurés.
+- Le codage Huffman (transport web) est **hors du chemin de sécurité** et
+  ne se combine pas avec la trame rigide sur le même flux.
+
+---
+
+## Conclusion
+
+L'écosystème Octet-Économe introduit une logique de sécurité structurelle
+fondée sur la réduction de la surface exploitable, la séparation des
+privilèges, la redondance physique et la validation matérielle du flux.
+Son ambition est de transformer les systèmes critiques d'un modèle
+centralisé et vulnérable en une architecture distribuée, résiliente et
+anti-ransomware par construction — à condition d'auditer en priorité la
+source de dédoublement et de mesurer les latences de détection.
